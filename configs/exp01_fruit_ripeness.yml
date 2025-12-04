@@ -1,0 +1,230 @@
+# Experiment 01: Fruit Ripeness Segmentation
+# Dataset: MinneApple (apple detection and ripeness assessment)
+# Goal: Segment apples and classify ripeness levels (unripe, ripe, overripe)
+
+experiment:
+  name: "exp01_fruit_ripeness"
+  domain: "fruit_ripeness"
+  description: "Fine-tune SAM3 for fruit detection and ripeness assessment using MinneApple dataset"
+  concepts:
+    - "ripeness"
+    - "fruit_detection"
+    - "color_based_classification"
+  
+# Model configuration
+model:
+  checkpoint: "path/to/sam3_pretrained.pth"  # Update with actual SAM3 checkpoint path
+  architecture: "sam3_base"
+  
+# Dataset configuration
+dataset:
+  name: "MinneApple"
+  format: "coco"  # COCO JSON format
+  
+  # Dataset paths (update with your local paths)
+  images:
+    train: "data/minneapple/train/images"
+    val: "data/minneapple/val/images"
+    test: "data/minneapple/test/images"
+  
+  annotations:
+    train: "data/minneapple/train/annotations.json"
+    val: "data/minneapple/val/annotations.json"
+    test: "data/minneapple/test/annotations.json"
+  
+  # Agricultural concepts for this experiment
+  concepts:
+    - "ripeness"  # Primary concept: unripe, ripe, overripe
+    - "fruit_color"  # Green, red, yellow
+    - "fruit_size"  # Small, medium, large
+  
+  # Class mapping
+  classes:
+    - "apple_unripe"
+    - "apple_ripe"
+    - "apple_overripe"
+  
+  # Dataset statistics
+  stats:
+    num_images: 1200
+    num_train: 670
+    num_val: 250
+    num_test: 280
+    avg_instances_per_image: 15
+
+# Training configuration
+training:
+  # Resume from pretrained SAM3 or previous experiment
+  resume_from: "pretrained"  # Options: "pretrained", "path/to/checkpoint.pth"
+  
+  # Basic hyperparameters
+  epochs: 50
+  batch_size: 2  # SAM3 requires large memory, adjust based on GPU
+  learning_rate: 0.00005  # 5e-5, conservative for fine-tuning
+  weight_decay: 0.05
+  gradient_clip: 1.0
+  gradient_accumulation: 4  # Effective batch size: 2 * 4 = 8
+  
+  # Optimizer
+  optimizer: "adamw"
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  
+  # Learning rate schedule
+  warmup_epochs: 2
+  scheduler: "cosine"  # Cosine annealing with warmup
+  min_lr: 0.000001  # 1e-6
+  
+  # Mixed precision training
+  mixed_precision: true
+  
+  # Image resolution (SAM3 default)
+  resolution: 1008
+  
+  # Module freezing strategy
+  freeze_vision_encoder: false  # Train vision encoder
+  freeze_text_encoder: false    # Train text encoder for agricultural concepts
+  freeze_tracker: true          # Always freeze tracker (per SAM3 design)
+  
+  # Loss weights
+  loss_weights:
+    segmentation: 1.0   # Focal + Dice loss
+    grounding: 0.5      # Vision-language alignment
+    ripeness: 0.3       # Ripeness classification (domain-specific)
+  
+  # Data loading
+  num_workers: 4
+  pin_memory: true
+  prefetch_factor: 2
+  
+  # Checkpointing
+  save_frequency: 5  # Save every 5 epochs
+  keep_last_n: 3     # Keep last 3 checkpoints
+  
+  # Early stopping
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.0001
+
+# Data augmentation
+augmentation:
+  train:
+    horizontal_flip: 0.5
+    vertical_flip: 0.3
+    rotate_90: 0.5
+    shift_scale_rotate:
+      shift_limit: 0.1
+      scale_limit: 0.2
+      rotate_limit: 30
+      p: 0.5
+    brightness_contrast:
+      brightness_limit: 0.2
+      contrast_limit: 0.2
+      p: 0.5
+    hue_saturation_value:
+      hue_shift_limit: 20
+      sat_shift_limit: 30
+      val_shift_limit: 20
+      p: 0.5
+    gaussian_blur:
+      blur_limit: [3, 7]
+      p: 0.3
+    coarse_dropout:
+      max_holes: 8
+      max_height: 32
+      max_width: 32
+      p: 0.3
+  
+  val:
+    # No augmentation for validation
+    enabled: false
+
+# Evaluation configuration
+evaluation:
+  # Segmentation metrics
+  metrics:
+    - "iou"
+    - "dice"
+    - "precision"
+    - "recall"
+    - "f1"
+  
+  # Domain-specific metrics
+  domain_metrics:
+    - "ripeness_accuracy"  # Classification accuracy for ripeness
+    - "ripeness_recall_per_class"  # Recall for each ripeness level
+    - "color_consistency"  # Consistency between predicted ripeness and color
+  
+  # Evaluation frequency
+  eval_frequency: 1  # Evaluate every epoch
+  
+  # Visualization
+  visualize:
+    enabled: true
+    frequency: 5  # Visualize every 5 epochs
+    num_samples: 10  # Visualize 10 samples
+
+# Output configuration
+output:
+  save_dir: "outputs/exp01_fruit_ripeness"
+  
+  # Logging
+  logging:
+    log_dir: "logs"
+    tensorboard: true
+    wandb: false  # Set to true if using Weights & Biases
+    
+  # Wandb config (if enabled)
+  wandb:
+    project: "AgriSAM3"
+    entity: "your-wandb-username"
+    name: "exp01_fruit_ripeness"
+    tags:
+      - "fruit_ripeness"
+      - "apple"
+      - "minneapple"
+
+# Prompt generation configuration
+prompts:
+  # Template selection
+  domain: "fruit_ripeness"
+  
+  # Attribute-based prompt generation
+  attributes:
+    ripeness:
+      values: ["unripe", "ripe", "overripe"]
+      include_in_prompt: true
+    color:
+      values: ["green", "yellow", "red"]
+      include_in_prompt: true
+    size:
+      values: ["small", "medium", "large"]
+      include_in_prompt: false
+  
+  # Negative prompts
+  use_negative_prompts: true
+  negative_examples:
+    - "background"
+    - "leaves"
+    - "branches"
+    - "sky"
+
+# Expected results (for documentation)
+expected_results:
+  segmentation_iou: 0.75  # Target IoU for apple segmentation
+  ripeness_accuracy: 0.85  # Target accuracy for ripeness classification
+  training_time_hours: 4  # Estimated on single A100 GPU
+  
+# Notes
+notes: |
+  Experiment 01 focuses on fruit ripeness assessment, a critical task for precision agriculture.
+  The MinneApple dataset provides apple images with ripeness annotations.
+  
+  Key challenges:
+  - Color variation due to lighting conditions
+  - Occlusion by leaves and branches
+  - Distinguishing between ripeness levels
+  
+  This experiment establishes baseline performance for fruit-specific segmentation
+  and trains SAM3 on agricultural-specific concepts (ripeness, color).

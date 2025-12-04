@@ -1,0 +1,212 @@
+# Experiment 03: Plant Disease Segmentation
+# Datasets: PlantDoc + PlantVillage
+# Goal: Segment diseased regions and classify disease types
+
+experiment:
+  name: "exp03_disease"
+  domain: "disease"
+  description: "Fine-tune SAM3 for plant disease detection and segmentation using PlantDoc and PlantVillage"
+  concepts:
+    - "disease_detection"
+    - "symptom_segmentation"
+    - "health_assessment"
+
+model:
+  checkpoint: "outputs/exp02_crop_weed/checkpoints/best_model.pth"  # Progressive from exp02
+  architecture: "sam3_base"
+
+dataset:
+  name: "PlantDoc_PlantVillage"
+  format: "coco"
+  
+  images:
+    train: "data/plant_disease/train/images"
+    val: "data/plant_disease/val/images"
+    test: "data/plant_disease/test/images"
+  
+  annotations:
+    train: "data/plant_disease/train/annotations.json"
+    val: "data/plant_disease/val/annotations.json"
+    test: "data/plant_disease/test/annotations.json"
+  
+  concepts:
+    - "disease_classification"
+    - "symptom_severity"
+    - "affected_area"
+  
+  classes:
+    # Major crop diseases
+    - "apple_scab"
+    - "apple_black_rot"
+    - "tomato_early_blight"
+    - "tomato_late_blight"
+    - "tomato_leaf_mold"
+    - "grape_black_rot"
+    - "grape_esca"
+    - "corn_rust"
+    - "corn_leaf_blight"
+    - "potato_early_blight"
+    - "potato_late_blight"
+    - "wheat_rust"
+    - "healthy"
+  
+  stats:
+    num_images: 20000
+    num_train: 14000
+    num_val: 3000
+    num_test: 3000
+    avg_instances_per_image: 8
+
+training:
+  resume_from: "outputs/exp02_crop_weed/checkpoints/best_model.pth"
+  
+  epochs: 45
+  batch_size: 2
+  learning_rate: 0.000025  # Further reduced for disease fine-tuning
+  weight_decay: 0.05
+  gradient_clip: 1.0
+  gradient_accumulation: 4
+  
+  optimizer: "adamw"
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  
+  warmup_epochs: 1
+  scheduler: "cosine"
+  min_lr: 0.000001
+  
+  mixed_precision: true
+  resolution: 1008
+  
+  freeze_vision_encoder: false
+  freeze_text_encoder: false
+  freeze_tracker: true
+  
+  loss_weights:
+    segmentation: 1.0
+    grounding: 0.5
+    disease_classification: 0.6  # Important for disease ID
+    severity_estimation: 0.3
+  
+  num_workers: 4
+  pin_memory: true
+  prefetch_factor: 2
+  
+  save_frequency: 5
+  keep_last_n: 3
+  
+  early_stopping:
+    enabled: true
+    patience: 12
+    min_delta: 0.0001
+
+augmentation:
+  train:
+    horizontal_flip: 0.5
+    vertical_flip: 0.5
+    rotate_90: 0.5
+    shift_scale_rotate:
+      shift_limit: 0.1
+      scale_limit: 0.2
+      rotate_limit: 30
+      p: 0.5
+    brightness_contrast:
+      brightness_limit: 0.3
+      contrast_limit: 0.3
+      p: 0.7  # Important for disease appearance
+    hue_saturation_value:
+      hue_shift_limit: 30
+      sat_shift_limit: 40
+      val_shift_limit: 30
+      p: 0.7
+    gaussian_blur:
+      blur_limit: [3, 9]
+      p: 0.4
+    gaussian_noise:
+      p: 0.3
+    color_jitter:
+      p: 0.5  # Simulate different lighting/camera conditions
+  
+  val:
+    enabled: false
+
+evaluation:
+  metrics:
+    - "iou"
+    - "dice"
+    - "precision"
+    - "recall"
+    - "f1"
+  
+  domain_metrics:
+    - "disease_accuracy"
+    - "disease_recall_per_class"
+    - "severity_mae"  # Mean absolute error for severity
+    - "healthy_vs_diseased_accuracy"
+    - "confusion_matrix"
+  
+  eval_frequency: 1
+  
+  visualize:
+    enabled: true
+    frequency: 5
+    num_samples: 15
+
+output:
+  save_dir: "outputs/exp03_disease"
+  
+  logging:
+    log_dir: "logs"
+    tensorboard: true
+    wandb: false
+    
+  wandb:
+    project: "AgriSAM3"
+    entity: "your-wandb-username"
+    name: "exp03_disease"
+    tags:
+      - "plant_disease"
+      - "disease_detection"
+      - "plantdoc"
+      - "plantvillage"
+
+prompts:
+  domain: "disease"
+  
+  attributes:
+    health:
+      values: ["healthy", "diseased"]
+      include_in_prompt: true
+    disease:
+      values: ["scab", "black_rot", "early_blight", "late_blight", "rust", "leaf_mold"]
+      include_in_prompt: true
+    severity:
+      values: ["mild", "moderate", "severe"]
+      include_in_prompt: true
+    host:
+      values: ["apple", "tomato", "grape", "corn", "potato", "wheat"]
+      include_in_prompt: true
+  
+  use_negative_prompts: true
+  negative_examples:
+    - "healthy_tissue"
+    - "natural_leaf_variation"
+    - "shadows"
+    - "water_droplets"
+
+expected_results:
+  segmentation_iou: 0.68
+  disease_accuracy: 0.82
+  healthy_vs_diseased_accuracy: 0.92
+  training_time_hours: 7
+
+notes: |
+  Experiment 03 focuses on disease detection and symptom segmentation.
+  Critical for early disease diagnosis and precision treatment application.
+  
+  Challenges:
+  - Fine-grained symptom differences between diseases
+  - Varying appearance based on disease progression
+  - Distinguishing diseases from nutrient deficiencies
+  
+  Progressive training builds on vegetation understanding from exp01-02.

@@ -1,0 +1,219 @@
+# Experiment 06: Greenhouse Environment Segmentation
+# Dataset: Custom greenhouse dataset (to be collected/synthesized)
+# Goal: Segment plants and structures in controlled greenhouse environments
+
+experiment:
+  name: "exp06_greenhouse"
+  domain: "greenhouse"
+  description: "Fine-tune SAM3 for indoor greenhouse segmentation - plants, growth stages, and infrastructure"
+  concepts:
+    - "indoor_plant_segmentation"
+    - "growth_monitoring"
+    - "greenhouse_infrastructure"
+
+model:
+  checkpoint: "outputs/exp05_pests/checkpoints/best_model.pth"  # Progressive from exp05
+  architecture: "sam3_base"
+
+dataset:
+  name: "Greenhouse_Custom"
+  format: "coco"
+  
+  images:
+    train: "data/greenhouse/train/images"
+    val: "data/greenhouse/val/images"
+    test: "data/greenhouse/test/images"
+  
+  annotations:
+    train: "data/greenhouse/train/annotations.json"
+    val: "data/greenhouse/val/annotations.json"
+    test: "data/greenhouse/test/annotations.json"
+  
+  concepts:
+    - "plant_health"
+    - "growth_stage"
+    - "lighting_conditions"
+    - "infrastructure_detection"
+  
+  classes:
+    - "tomato_plant"
+    - "lettuce"
+    - "cucumber"
+    - "pepper"
+    - "strawberry"
+    - "herbs"
+    - "grow_light"
+    - "irrigation_system"
+    - "support_structure"
+    - "container"
+  
+  stats:
+    num_images: 8000
+    num_train: 5600
+    num_val: 1200
+    num_test: 1200
+    avg_instances_per_image: 12
+
+training:
+  resume_from: "outputs/exp05_pests/checkpoints/best_model.pth"
+  
+  epochs: 35
+  batch_size: 2
+  learning_rate: 0.000015  # Fine-tuning for specific environment
+  weight_decay: 0.05
+  gradient_clip: 1.0
+  gradient_accumulation: 4
+  
+  optimizer: "adamw"
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  
+  warmup_epochs: 1
+  scheduler: "cosine"
+  min_lr: 0.000001
+  
+  mixed_precision: true
+  resolution: 1008
+  
+  freeze_vision_encoder: false
+  freeze_text_encoder: false
+  freeze_tracker: true
+  
+  loss_weights:
+    segmentation: 1.0
+    grounding: 0.5
+    health_assessment: 0.4
+    growth_stage: 0.3
+  
+  num_workers: 4
+  pin_memory: true
+  prefetch_factor: 2
+  
+  save_frequency: 5
+  keep_last_n: 3
+  
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.0001
+
+augmentation:
+  train:
+    horizontal_flip: 0.5
+    vertical_flip: 0.2
+    rotate_90: 0.3
+    shift_scale_rotate:
+      shift_limit: 0.1
+      scale_limit: 0.2
+      rotate_limit: 20
+      p: 0.4
+    brightness_contrast:
+      brightness_limit: 0.35  # Greenhouse lighting varies significantly
+      contrast_limit: 0.35
+      p: 0.8
+    hue_saturation_value:
+      hue_shift_limit: 15
+      sat_shift_limit: 25
+      val_shift_limit: 15
+      p: 0.7
+    gaussian_blur:
+      blur_limit: [3, 5]
+      p: 0.3
+    rgb_shift:
+      r_shift_limit: 30
+      g_shift_limit: 30
+      b_shift_limit: 30
+      p: 0.5  # Different grow light spectra
+    random_shadow:
+      p: 0.4  # Infrastructure creates shadows
+  
+  val:
+    enabled: false
+
+evaluation:
+  metrics:
+    - "iou"
+    - "dice"
+    - "precision"
+    - "recall"
+    - "f1"
+  
+  domain_metrics:
+    - "plant_health_accuracy"
+    - "growth_stage_accuracy"
+    - "plant_count_accuracy"
+    - "infrastructure_detection_accuracy"
+    - "dense_occlusion_handling"  # Plants overlap significantly
+  
+  eval_frequency: 1
+  
+  visualize:
+    enabled: true
+    frequency: 5
+    num_samples: 15
+
+output:
+  save_dir: "outputs/exp06_greenhouse"
+  
+  logging:
+    log_dir: "logs"
+    tensorboard: true
+    wandb: false
+    
+  wandb:
+    project: "AgriSAM3"
+    entity: "your-wandb-username"
+    name: "exp06_greenhouse"
+    tags:
+      - "greenhouse"
+      - "indoor_agriculture"
+      - "controlled_environment"
+
+prompts:
+  domain: "greenhouse"
+  
+  attributes:
+    plant_type:
+      values: ["tomato", "lettuce", "cucumber", "pepper", "strawberry"]
+      include_in_prompt: true
+    health:
+      values: ["healthy", "stressed", "nutrient_deficient"]
+      include_in_prompt: true
+    growth_stage:
+      values: ["seedling", "vegetative", "flowering", "fruiting"]
+      include_in_prompt: true
+    lighting:
+      values: ["natural_light", "grow_light", "mixed_lighting"]
+      include_in_prompt: false
+  
+  use_negative_prompts: true
+  negative_examples:
+    - "greenhouse_structure"
+    - "walkways"
+    - "equipment"
+    - "empty_containers"
+
+expected_results:
+  segmentation_iou: 0.73
+  plant_health_accuracy: 0.86
+  growth_stage_accuracy: 0.82
+  training_time_hours: 5
+
+notes: |
+  Experiment 06 completes the agricultural domain coverage with greenhouse/indoor agriculture.
+  
+  Unique challenges:
+  - Artificial lighting creates different spectral characteristics
+  - Dense plant arrangements cause heavy occlusion
+  - Controlled environment but variable lighting conditions
+  - Need to distinguish plants from support structures
+  
+  Progressive training from 5 previous experiments creates universal agricultural model:
+  - Exp01: Fruit understanding
+  - Exp02: Crop-weed discrimination
+  - Exp03: Disease detection
+  - Exp04: Aerial perspective
+  - Exp05: Pest recognition
+  - Exp06: Indoor environment
+  
+  Final model should generalize across all agricultural contexts.

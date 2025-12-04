@@ -1,0 +1,215 @@
+# Experiment 05: Insect Pest Segmentation
+# Dataset: IP102 (Insect Pest Recognition)
+# Goal: Detect and segment agricultural insect pests
+
+experiment:
+  name: "exp05_pests"
+  domain: "pest"
+  description: "Fine-tune SAM3 for insect pest detection and segmentation using IP102 dataset"
+  concepts:
+    - "pest_detection"
+    - "insect_segmentation"
+    - "damage_assessment"
+
+model:
+  checkpoint: "outputs/exp04_multi_crop/checkpoints/best_model.pth"  # Progressive from exp04
+  architecture: "sam3_base"
+
+dataset:
+  name: "IP102"
+  format: "coco"
+  
+  images:
+    train: "data/ip102/train/images"
+    val: "data/ip102/val/images"
+    test: "data/ip102/test/images"
+  
+  annotations:
+    train: "data/ip102/train/annotations.json"
+    val: "data/ip102/val/annotations.json"
+    test: "data/ip102/test/annotations.json"
+  
+  concepts:
+    - "pest_species"
+    - "damage_type"
+    - "infestation_severity"
+  
+  classes:
+    # Major agricultural pests (102 classes total, showing key examples)
+    - "aphids"
+    - "armyworm"
+    - "beetles"
+    - "bollworm"
+    - "cutworm"
+    - "leaf_miner"
+    - "mealybug"
+    - "moth"
+    - "sawfly"
+    - "scale_insect"
+    - "thrips"
+    - "whitefly"
+    # ... (102 total pest classes)
+  
+  stats:
+    num_images: 25000
+    num_train: 17500
+    num_val: 3750
+    num_test: 3750
+    avg_instances_per_image: 3
+
+training:
+  resume_from: "outputs/exp04_multi_crop/checkpoints/best_model.pth"
+  
+  epochs: 50
+  batch_size: 2
+  learning_rate: 0.00003
+  weight_decay: 0.05
+  gradient_clip: 1.0
+  gradient_accumulation: 4
+  
+  optimizer: "adamw"
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  
+  warmup_epochs: 2
+  scheduler: "cosine"
+  min_lr: 0.000001
+  
+  mixed_precision: true
+  resolution: 1008
+  
+  freeze_vision_encoder: false
+  freeze_text_encoder: false
+  freeze_tracker: true
+  
+  loss_weights:
+    segmentation: 1.0
+    grounding: 0.5
+    pest_classification: 0.6  # Important for species ID
+    severity_estimation: 0.3
+  
+  num_workers: 4
+  pin_memory: true
+  prefetch_factor: 2
+  
+  save_frequency: 5
+  keep_last_n: 3
+  
+  early_stopping:
+    enabled: true
+    patience: 12
+    min_delta: 0.0001
+
+augmentation:
+  train:
+    horizontal_flip: 0.5
+    vertical_flip: 0.3
+    rotate_90: 0.3
+    shift_scale_rotate:
+      shift_limit: 0.15
+      scale_limit: 0.3
+      rotate_limit: 30
+      p: 0.5
+    brightness_contrast:
+      brightness_limit: 0.3
+      contrast_limit: 0.3
+      p: 0.6
+    hue_saturation_value:
+      hue_shift_limit: 25
+      sat_shift_limit: 35
+      val_shift_limit: 25
+      p: 0.6
+    gaussian_blur:
+      blur_limit: [3, 7]
+      p: 0.4
+    motion_blur:
+      p: 0.3  # Insects move quickly
+    gaussian_noise:
+      p: 0.4
+    random_scale:
+      scale_limit: 0.4  # Pests vary greatly in size
+      p: 0.5
+  
+  val:
+    enabled: false
+
+evaluation:
+  metrics:
+    - "iou"
+    - "dice"
+    - "precision"
+    - "recall"
+    - "f1"
+  
+  domain_metrics:
+    - "pest_species_accuracy"
+    - "detection_rate"  # Recall is critical for pest management
+    - "false_alarm_rate"
+    - "per_pest_accuracy"
+    - "small_object_detection_rate"  # Many pests are small
+  
+  eval_frequency: 1
+  
+  visualize:
+    enabled: true
+    frequency: 5
+    num_samples: 20  # More samples due to variety
+
+output:
+  save_dir: "outputs/exp05_pests"
+  
+  logging:
+    log_dir: "logs"
+    tensorboard: true
+    wandb: false
+    
+  wandb:
+    project: "AgriSAM3"
+    entity: "your-wandb-username"
+    name: "exp05_pests"
+    tags:
+      - "pest_detection"
+      - "insect_segmentation"
+      - "ip102"
+
+prompts:
+  domain: "pest"
+  
+  attributes:
+    pest_type:
+      values: ["aphid", "beetle", "moth", "fly", "thrips", "mite"]
+      include_in_prompt: true
+    host_plant:
+      values: ["corn", "wheat", "rice", "cotton", "vegetables"]
+      include_in_prompt: true
+    damage_type:
+      values: ["leaf_damage", "stem_boring", "root_damage", "fruit_damage"]
+      include_in_prompt: false
+    severity:
+      values: ["low", "medium", "high"]
+      include_in_prompt: true
+  
+  use_negative_prompts: true
+  negative_examples:
+    - "beneficial_insects"
+    - "spiders"
+    - "debris"
+    - "water_droplets"
+
+expected_results:
+  segmentation_iou: 0.62  # Lower due to small object size
+  pest_species_accuracy: 0.75
+  detection_rate: 0.85  # High recall critical
+  training_time_hours: 8
+
+notes: |
+  Experiment 05 introduces pest detection, critical for IPM (Integrated Pest Management).
+  
+  Challenges:
+  - Small object sizes (many pests < 50 pixels)
+  - High intra-class variation (102 pest species)
+  - Fast movement creates motion blur
+  - Camouflage and occlusion
+  
+  Progressive training from crop/disease knowledge helps with context understanding.
+  Pest detection combined with crop identification enables precision pest management.

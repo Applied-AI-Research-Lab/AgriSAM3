@@ -1,0 +1,197 @@
+# Experiment 02: Crop-Weed Segmentation
+# Datasets: DeepWeeds + Agriculture-Vision
+# Goal: Distinguish between crops and weeds for precision weed management
+
+experiment:
+  name: "exp02_crop_weed"
+  domain: "crop_weed"
+  description: "Fine-tune SAM3 for crop-weed discrimination using DeepWeeds and Agriculture-Vision datasets"
+  concepts:
+    - "crop_detection"
+    - "weed_detection"
+    - "vegetation_classification"
+
+model:
+  checkpoint: "outputs/exp01_fruit_ripeness/checkpoints/best_model.pth"  # Progressive training from exp01
+  architecture: "sam3_base"
+
+dataset:
+  name: "DeepWeeds_AgriVision"
+  format: "coco"
+  
+  images:
+    train: "data/crop_weed/train/images"
+    val: "data/crop_weed/val/images"
+    test: "data/crop_weed/test/images"
+  
+  annotations:
+    train: "data/crop_weed/train/annotations.json"
+    val: "data/crop_weed/val/annotations.json"
+    test: "data/crop_weed/test/annotations.json"
+  
+  concepts:
+    - "crop_vs_weed"
+    - "species_classification"
+    - "growth_stage"
+  
+  classes:
+    - "chinee_apple"
+    - "lantana"
+    - "parkinsonia"
+    - "parthenium"
+    - "prickly_acacia"
+    - "rubber_vine"
+    - "siam_weed"
+    - "snake_weed"
+    - "crop_corn"
+    - "crop_soybean"
+  
+  stats:
+    num_images: 18000
+    num_train: 12600
+    num_val: 2700
+    num_test: 2700
+    avg_instances_per_image: 25
+
+training:
+  resume_from: "outputs/exp01_fruit_ripeness/checkpoints/best_model.pth"
+  
+  epochs: 40
+  batch_size: 2
+  learning_rate: 0.00003  # Lower LR since fine-tuning from exp01
+  weight_decay: 0.05
+  gradient_clip: 1.0
+  gradient_accumulation: 4
+  
+  optimizer: "adamw"
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  
+  warmup_epochs: 1
+  scheduler: "cosine"
+  min_lr: 0.000001
+  
+  mixed_precision: true
+  resolution: 1008
+  
+  freeze_vision_encoder: false
+  freeze_text_encoder: false
+  freeze_tracker: true
+  
+  loss_weights:
+    segmentation: 1.0
+    grounding: 0.5
+    classification: 0.4  # Crop vs weed classification
+  
+  num_workers: 4
+  pin_memory: true
+  prefetch_factor: 2
+  
+  save_frequency: 5
+  keep_last_n: 3
+  
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.0001
+
+augmentation:
+  train:
+    horizontal_flip: 0.5
+    vertical_flip: 0.5
+    rotate_90: 0.5
+    shift_scale_rotate:
+      shift_limit: 0.15
+      scale_limit: 0.25
+      rotate_limit: 45
+      p: 0.6
+    brightness_contrast:
+      brightness_limit: 0.25
+      contrast_limit: 0.25
+      p: 0.6
+    hue_saturation_value:
+      hue_shift_limit: 25
+      sat_shift_limit: 40
+      val_shift_limit: 25
+      p: 0.6
+    gaussian_blur:
+      blur_limit: [3, 7]
+      p: 0.4
+    random_rain:
+      p: 0.2  # Simulate weather conditions
+    random_shadow:
+      p: 0.3
+  
+  val:
+    enabled: false
+
+evaluation:
+  metrics:
+    - "iou"
+    - "dice"
+    - "precision"
+    - "recall"
+    - "f1"
+  
+  domain_metrics:
+    - "crop_weed_accuracy"
+    - "species_identification_accuracy"
+    - "false_positive_rate"  # Critical for weed management
+    - "false_negative_rate"
+  
+  eval_frequency: 1
+  
+  visualize:
+    enabled: true
+    frequency: 5
+    num_samples: 10
+
+output:
+  save_dir: "outputs/exp02_crop_weed"
+  
+  logging:
+    log_dir: "logs"
+    tensorboard: true
+    wandb: false
+    
+  wandb:
+    project: "AgriSAM3"
+    entity: "your-wandb-username"
+    name: "exp02_crop_weed"
+    tags:
+      - "crop_weed"
+      - "weed_detection"
+      - "deepweeds"
+
+prompts:
+  domain: "crop_weed"
+  
+  attributes:
+    type:
+      values: ["crop", "weed"]
+      include_in_prompt: true
+    species:
+      values: ["corn", "soybean", "chinee_apple", "lantana", "parthenium"]
+      include_in_prompt: true
+    growth_stage:
+      values: ["seedling", "vegetative", "mature"]
+      include_in_prompt: true
+  
+  use_negative_prompts: true
+  negative_examples:
+    - "bare_soil"
+    - "rocks"
+    - "mulch"
+    - "equipment"
+
+expected_results:
+  segmentation_iou: 0.72
+  crop_weed_accuracy: 0.88
+  training_time_hours: 6
+
+notes: |
+  Experiment 02 extends agricultural knowledge to crop-weed discrimination.
+  Combines DeepWeeds (Australian weed species) with Agriculture-Vision (US crops).
+  
+  Progressive training from exp01 helps transfer fruit segmentation knowledge.
+  Critical for precision herbicide application and mechanical weeding.

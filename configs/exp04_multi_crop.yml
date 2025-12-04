@@ -1,0 +1,205 @@
+# Experiment 04: Multi-Crop Field Segmentation
+# Dataset: Agriculture-Vision
+# Goal: Segment different crop types and field boundaries in aerial imagery
+
+experiment:
+  name: "exp04_multi_crop"
+  domain: "multi_crop"
+  description: "Fine-tune SAM3 for multi-crop field segmentation using Agriculture-Vision aerial dataset"
+  concepts:
+    - "crop_type_segmentation"
+    - "field_boundary_detection"
+    - "aerial_imagery_understanding"
+
+model:
+  checkpoint: "outputs/exp03_disease/checkpoints/best_model.pth"  # Progressive from exp03
+  architecture: "sam3_base"
+
+dataset:
+  name: "Agriculture_Vision"
+  format: "coco"
+  
+  images:
+    train: "data/agriculture_vision/train/images"
+    val: "data/agriculture_vision/val/images"
+    test: "data/agriculture_vision/test/images"
+  
+  annotations:
+    train: "data/agriculture_vision/train/annotations.json"
+    val: "data/agriculture_vision/val/annotations.json"
+    test: "data/agriculture_vision/test/annotations.json"
+  
+  concepts:
+    - "crop_type"
+    - "field_boundaries"
+    - "growth_stage"
+    - "land_use"
+  
+  classes:
+    - "corn"
+    - "soybeans"
+    - "wheat"
+    - "cotton"
+    - "rice"
+    - "sugarcane"
+    - "field_boundary"
+    - "bare_soil"
+    - "grassland"
+  
+  stats:
+    num_images: 15000
+    num_train: 10500
+    num_val: 2250
+    num_test: 2250
+    avg_instances_per_image: 5
+
+training:
+  resume_from: "outputs/exp03_disease/checkpoints/best_model.pth"
+  
+  epochs: 40
+  batch_size: 2
+  learning_rate: 0.00002
+  weight_decay: 0.05
+  gradient_clip: 1.0
+  gradient_accumulation: 4
+  
+  optimizer: "adamw"
+  betas: [0.9, 0.999]
+  eps: 1.0e-08
+  
+  warmup_epochs: 1
+  scheduler: "cosine"
+  min_lr: 0.000001
+  
+  mixed_precision: true
+  resolution: 1008
+  
+  freeze_vision_encoder: false
+  freeze_text_encoder: false
+  freeze_tracker: true
+  
+  loss_weights:
+    segmentation: 1.0
+    grounding: 0.5
+    crop_classification: 0.5
+    boundary_detection: 0.4
+  
+  num_workers: 4
+  pin_memory: true
+  prefetch_factor: 2
+  
+  save_frequency: 5
+  keep_last_n: 3
+  
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.0001
+
+augmentation:
+  train:
+    horizontal_flip: 0.5
+    vertical_flip: 0.5
+    rotate_90: 0.5
+    shift_scale_rotate:
+      shift_limit: 0.2
+      scale_limit: 0.3
+      rotate_limit: 45
+      p: 0.6
+    brightness_contrast:
+      brightness_limit: 0.25
+      contrast_limit: 0.25
+      p: 0.6
+    hue_saturation_value:
+      hue_shift_limit: 20
+      sat_shift_limit: 30
+      val_shift_limit: 20
+      p: 0.6
+    gaussian_blur:
+      blur_limit: [3, 7]
+      p: 0.3
+    random_fog:
+      p: 0.2  # Aerial imagery conditions
+    random_sun_flare:
+      p: 0.1
+  
+  val:
+    enabled: false
+
+evaluation:
+  metrics:
+    - "iou"
+    - "dice"
+    - "precision"
+    - "recall"
+    - "f1"
+  
+  domain_metrics:
+    - "crop_type_accuracy"
+    - "boundary_detection_iou"
+    - "field_coverage_estimation_error"
+    - "per_crop_iou"
+  
+  eval_frequency: 1
+  
+  visualize:
+    enabled: true
+    frequency: 5
+    num_samples: 10
+
+output:
+  save_dir: "outputs/exp04_multi_crop"
+  
+  logging:
+    log_dir: "logs"
+    tensorboard: true
+    wandb: false
+    
+  wandb:
+    project: "AgriSAM3"
+    entity: "your-wandb-username"
+    name: "exp04_multi_crop"
+    tags:
+      - "multi_crop"
+      - "field_segmentation"
+      - "aerial_imagery"
+      - "agriculture_vision"
+
+prompts:
+  domain: "multi_crop"
+  
+  attributes:
+    crop_type:
+      values: ["corn", "soybeans", "wheat", "cotton", "rice", "sugarcane"]
+      include_in_prompt: true
+    growth_stage:
+      values: ["early_season", "mid_season", "late_season"]
+      include_in_prompt: true
+    field_status:
+      values: ["planted", "growing", "harvested"]
+      include_in_prompt: false
+  
+  use_negative_prompts: true
+  negative_examples:
+    - "roads"
+    - "buildings"
+    - "water_bodies"
+    - "forests"
+
+expected_results:
+  segmentation_iou: 0.70
+  crop_type_accuracy: 0.80
+  boundary_iou: 0.65
+  training_time_hours: 5
+
+notes: |
+  Experiment 04 shifts to aerial/satellite imagery perspective.
+  Focuses on large-scale field segmentation for crop monitoring.
+  
+  Applications:
+  - Crop acreage estimation
+  - Growth stage monitoring
+  - Field boundary mapping
+  - Yield prediction
+  
+  Different scale and viewpoint from previous experiments tests model generalization.
