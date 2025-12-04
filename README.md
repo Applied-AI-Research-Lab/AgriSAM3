@@ -382,19 +382,6 @@ evaluation:
 - Concept Recall: 0.73
 - Demonstrates strong generalization to unseen agricultural concepts
 
-## Citation
-
-If you use AgriSAM3 in your research, please cite:
-
-```bibtex
-@article{sapkota2025agrisam3,
-  title={AgriSAM3: Delving into Segment Anything with Agricultural Concepts},
-  author={Sapkota, Ranjan and Roumeliotis, Konstantinos I. and Karkee, Manoj},
-  journal={arXiv preprint arXiv:XXXX.XXXXX},
-  year={2025}
-}
-```
-
 ## License
 
 Apache 2.0 - See LICENSE file for details
